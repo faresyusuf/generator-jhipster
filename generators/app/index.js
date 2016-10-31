@@ -55,11 +55,11 @@ module.exports = JhipsterGenerator.extend({
             defaults: false
         });
 
-        // This adds support for a `--[no-]check-install` flag
-        this.option('check-install', {
+        // This adds support for a `--skip-checks` flag
+        this.option('skip-checks', {
             desc: 'Check the status of the required tools',
             type: Boolean,
-            defaults: true
+            defaults: false
         });
 
         // This adds support for a `--jhi-prefix` flag
@@ -76,7 +76,7 @@ module.exports = JhipsterGenerator.extend({
         this.skipUserManagement = this.configOptions.skipUserManagement = this.options['skip-user-management'] || this.config.get('skipUserManagement');
         this.jhiPrefix = this.configOptions.jhiPrefix || this.config.get('jhiPrefix') || this.options['jhi-prefix'];
         this.withEntities = this.options['with-entities'];
-        this.checkInstall = this.options['check-install'];
+        this.checkInstall = !this.options['skip-checks'];
 
     },
     initializing: {
@@ -162,6 +162,11 @@ module.exports = JhipsterGenerator.extend({
             }
             this.baseName = this.config.get('baseName');
             this.jhipsterVersion = this.config.get('jhipsterVersion');
+            this.angularVersion = this.config.get('angularVersion');
+            if (!this.angularVersion) {
+                /* for backward compatibility */
+                this.angularVersion = 'angular1';
+            }
             this.testFrameworks = this.config.get('testFrameworks');
             this.enableTranslation = this.config.get('enableTranslation');
             this.nativeLanguage = this.config.get('nativeLanguage');
@@ -178,6 +183,8 @@ module.exports = JhipsterGenerator.extend({
 
         askForApplicationType: prompts.askForApplicationType,
 
+        askForClient: prompts.askForClient,
+
         askForModuleName: prompts.askForModuleName
     },
 
@@ -186,6 +193,7 @@ module.exports = JhipsterGenerator.extend({
             this.configOptions.skipI18nQuestion = true;
             this.configOptions.baseName = this.baseName;
             this.configOptions.logo = false;
+            this.configOptions.angularVersion = this.angularVersion;
             this.generatorType = 'app';
             if (this.applicationType === 'microservice') {
                 this.skipClient = true;
@@ -226,15 +234,27 @@ module.exports = JhipsterGenerator.extend({
         composeClient: function () {
             if (this.skipClient) return;
 
-            this.composeWith('jhipster:client', {
-                options: {
-                    'skip-install': this.options['skip-install'],
-                    configOptions: this.configOptions,
-                    force: this.options['force']
-                }
-            }, {
-                local: require.resolve('../client')
-            });
+            if (this.angularVersion === 'angular2') {
+                this.composeWith('jhipster:client-2', {
+                    options: {
+                        'skip-install': this.options['skip-install'],
+                        configOptions: this.configOptions,
+                        force: this.options['force']
+                    }
+                }, {
+                    local: require.resolve('../client-2')
+                });
+            } else {
+                this.composeWith('jhipster:client', {
+                    options: {
+                        'skip-install': this.options['skip-install'],
+                        configOptions: this.configOptions,
+                        force: this.options['force']
+                    }
+                }, {
+                    local: require.resolve('../client')
+                });
+            }
 
         },
 
@@ -252,12 +272,14 @@ module.exports = JhipsterGenerator.extend({
             this.configOptions.enableTranslation = this.enableTranslation;
             this.configOptions.nativeLanguage = this.nativeLanguage;
             this.configOptions.languages = this.languages;
+            this.configOptions.angularVersion = this.angularVersion;
         },
 
         insight: function () {
             var insight = this.insight();
             insight.trackWithEvent('generator', 'app');
             insight.track('app/applicationType', this.applicationType);
+            insight.track('app/angularVersion', this.angularVersion);
             insight.track('app/testFrameworks', this.testFrameworks);
         },
 
@@ -269,6 +291,7 @@ module.exports = JhipsterGenerator.extend({
         saveConfig: function () {
             this.config.set('jhipsterVersion', packagejs.version);
             this.config.set('applicationType', this.applicationType);
+            this.config.set('angularVersion', this.angularVersion);
             this.config.set('baseName', this.baseName);
             this.config.set('testFrameworks', this.testFrameworks);
             this.config.set('jhiPrefix', this.jhiPrefix);

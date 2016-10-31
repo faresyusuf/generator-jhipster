@@ -898,8 +898,8 @@ Generator.prototype.copyTemplate = function (source, dest, action, generator, op
         jhipsterUtils.copyWebResource(source, dest, regex, 'html', _this, _opt, template);
         break;
     case 'stripJs' :
-        regex = /\,[\s\n ]*(resolve)\:[\s ]*[\{][\s\n ]*[a-zA-Z]+\:(\s)*\[[ \'a-zA-Z0-9\$\,\(\)\{\}\n\.\<\%\=\-\>\;\s]*\}\][\s\n ]*\}/g;
-        //looks for something like mainTranslatePartialLoader: [*]
+        regex = /(\,[\s]*(resolve)\:[\s]*[\[]?[\{][\s]*(translatePartialLoader|token: 'translate')[\[]?[\'a-zA-Z0-9\$\,\(\)\{\}\.\<\%\=\-\>\;\s\:\[\]]*(\;[\s]*\}\][\s]*\}|\)[\s]*\}\]))|(import\s\{\s?[a-zA-Z0-9\=\<\>\%]*LanguageService\s?\}\sfrom\s[\"\'\.\/]*shared[\"|\']\;)/g;
+        //looks for something like translatePartialLoader: [*] or token: 'translate'
         jhipsterUtils.copyWebResource(source, dest, regex, 'js', _this, _opt, template);
         break;
     case 'copy' :
@@ -1496,6 +1496,47 @@ Generator.prototype.buildApplication = function (buildTool, profile, cb) {
     child.buildCmd = buildCmd;
 
     return child;
+};
+
+/**
+ * write the given files using provided config.
+ *
+ * @param {object} files - files to write
+ * @param {object} generator - the generator instance to use
+ */
+Generator.prototype.writeFilesToDisk = function (files, generator, returnFiles) {
+    let _this = generator || this;
+    let filesOut = [];
+    // using the fastest method for iterations
+    for (let i = 0, blocks = Object.keys(files); i < blocks.length; i++) {
+        for (let j = 0, blockTemplates = files[blocks[i]]; j < blockTemplates.length; j++) {
+            let blockTemplate = blockTemplates[j];
+            if (!blockTemplate.condition || blockTemplate.condition(_this)) {
+                let path = blockTemplate.path ? blockTemplate.path : '';
+                blockTemplate.templates.map(templateObj => {
+                    let templatePath;
+                    let method = 'template';
+                    let useTemplate = false;
+                    let interpolateRegex = {};
+                    if (typeof templateObj === 'string') {
+                        templatePath = path + templateObj;
+                    } else {
+                        templatePath = path + templateObj.file;
+                        method = templateObj.method ? templateObj.method : method;
+                        useTemplate = templateObj.template ? templateObj.template : useTemplate;
+                        interpolateRegex = templateObj.interpolate ? templateObj.interpolate : interpolateRegex;
+                    }
+                    let templatePathTo = templatePath.replace(/([/])_|^_/, '$1');
+                    if (returnFiles) {
+                        filesOut.push(templatePathTo);
+                    } else {
+                        _this[method](templatePath, templatePathTo, _this, interpolateRegex, useTemplate);
+                    }
+                });
+            }
+        }
+    }
+    return filesOut;
 };
 
 /*========================================================================*/
